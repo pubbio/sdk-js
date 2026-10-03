@@ -1,0 +1,26 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+      - name: Consume packed ESM and CommonJS entry points
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm install --ignore-scripts "$RUNNER_TEMP/pubb-sdk-0.2.0.tgz"
+          node --input-type=module -e 'import { Pubb } from "@pubb/sdk"; import { PubbServer } from "@pubb/sdk/server"; if (typeof Pubb !== "function" || typeof PubbServer !== "function") throw new Error("Invalid ESM exports")'
+          node -e 'const { Pubb } = require("@pubb/sdk"); const { PubbServer } = require("@pubb/sdk/server"); if (typeof Pubb !== "function" || typeof PubbServer !== "function") throw new Error("Invalid CJS exports")'
