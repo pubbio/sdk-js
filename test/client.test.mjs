@@ -45,6 +45,7 @@ test("encodes public keys, connects once and delivers Pubb application frames", 
   assert.equal(Socket.instances.length, 1);
   const socket = Socket.instances[0];
   assert.equal(new URL(socket.url).pathname, "/socket");
+  assert.equal(new URL(socket.url).searchParams.get("protocol"), "2");
   assert.equal(new URL(socket.url).searchParams.get("appKey"), 'key&? /"');
   socket.establish();
   assert.deepEqual(socket.sent, [{ action: "subscribe", channel: "notifications" }]);
@@ -116,6 +117,29 @@ test("presence handles native and legacy events, string payloads and disconnect 
   pubb.connect();
   const socket = Socket.instances[0];
   socket.receive({ event: "pusher_internal:subscription_succeeded", channel: "presence-room", data: JSON.stringify({ presence: { ids: ["a"], hash: { a: { name: "A" } }, count: 1 } }) });
+  socket.receive({ event: "pubb:member_added", channel: "presence-room", data: JSON.stringify({ user_id: "b", user_info: { name: "B" } }) });
+  assert.equal(channel.getMemberCount(), 2);
+  assert.equal(channel.getMembers().get("b").name, "B");
+  assert.equal(added.length, 1);
+  assert.deepEqual(added, legacyAdded);
+  channel.getMembers().clear();
+  assert.equal(channel.getMemberCount(), 2);
+  socket.receive({ event: "pusher_internal:member_removed", channel: "presence-room", data: { user_id: "a" } });
+  assert.equal(channel.getMemberCount(), 1);
+  pubb.disconnect();
+  assert.equal(channel.getMemberCount(), 0);
+});
+
+test("presence handles protocol 2 acknowledgement, string payloads and disconnect cleanup", () => {
+  const pubb = client();
+  const channel = pubb.subscribe("presence-room");
+  const added = [], legacyAdded = [];
+  assert(channel instanceof PresenceChannel);
+  channel.bind("pubb:member_added", member => added.push(member));
+  channel.bind("pusher:member_added", member => legacyAdded.push(member));
+  pubb.connect();
+  const socket = Socket.instances[0];
+  socket.receive({ event: "pubb:subscription_succeeded", channel: "presence-room", data: JSON.stringify({ presence: { ids: ["a"], hash: { a: { name: "A" } }, count: 1 } }) });
   socket.receive({ event: "pubb:member_added", channel: "presence-room", data: JSON.stringify({ user_id: "b", user_info: { name: "B" } }) });
   assert.equal(channel.getMemberCount(), 2);
   assert.equal(channel.getMembers().get("b").name, "B");

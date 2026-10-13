@@ -48,6 +48,7 @@ export class Pubb {
     this.reconnectTimer = undefined;
     const endpoint = new URL("/socket", this.options.wsHost);
     endpoint.searchParams.set("appKey", this.appKey);
+    endpoint.searchParams.set("protocol", "2");
     const socket = new WebSocket(endpoint.toString());
     this.socket = socket;
     this.stopped = false;
